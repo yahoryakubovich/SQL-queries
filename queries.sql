@@ -33,3 +33,33 @@ WHERE NOT EXISTS (
     FROM inventory
     WHERE inventory.film_id = film.film_id
 )
+
+WITH ActorFilmCounts AS (
+    SELECT
+        actor.actor_id,
+        actor.first_name,
+        actor.last_name,
+        COUNT(DISTINCT film_actor.film_id) AS film_count
+    FROM actor
+    JOIN film_actor ON actor.actor_id = film_actor.actor_id
+    JOIN film_category ON film_actor.film_id = film_category.film_id
+    JOIN category ON film_category.category_id = category.category_id
+    WHERE category.name = 'Children'
+    GROUP BY actor.actor_id, actor.first_name, actor.last_name
+)
+
+SELECT actor_id, first_name, last_name, film_count
+FROM ActorFilmCounts
+WHERE film_count = (SELECT MAX(film_count) FROM ActorFilmCounts)
+ORDER BY film_count DESC, actor_id;
+
+SELECT
+    address.city_id,
+    city.city,
+    COUNT(CASE WHEN customer.active = 1 THEN 1 END) AS active_customers,
+    COUNT(CASE WHEN customer.active = 0 THEN 1 END) AS inactive_customers
+FROM address
+JOIN customer ON address.address_id = customer.address_id
+JOIN city ON address.city_id = city.city_id
+GROUP BY address.city_id, city.city
+ORDER BY inactive_customers DESC;
