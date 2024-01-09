@@ -63,31 +63,63 @@ JOIN city ON address.city_id = city.city_id
 GROUP BY address.city_id, city.city
 ORDER BY inactive_customers DESC;
 
-WITH FilmCategoryRentHours AS (
+WITH CategoryRent AS (
     SELECT
-        category.name AS category_name, city.city,
-        address.city_id,
-        EXTRACT(EPOCH FROM (return_date - rental_date)) / 3600 AS hours_rented
+        c.name AS category_name,
+        SUM(EXTRACT(EPOCH FROM (r.return_date - r.rental_date)) / 3600) AS total_rent_hours
     FROM
-        rental
+        category c
     JOIN
-        inventory ON rental.inventory_id = inventory.inventory_id
+        film_category fc ON fc.category_id = c.category_id
     JOIN
-        category ON inventory.film_id = category.category_id
+        inventory i ON i.film_id = fc.film_id
     JOIN
-        customer ON rental.customer_id = customer.customer_id
+        rental r ON r.inventory_id = i.inventory_id
     JOIN
-        address ON customer.address_id = address.address_id
-        JOIN city ON address.city_id = city.city_id
+        customer c2 ON c2.customer_id = r.customer_id
+    JOIN
+        address a ON a.address_id = c2.address_id
+    JOIN
+        city c3 ON c3.city_id = a.city_id AND c3.city LIKE 'a%'
+    GROUP BY
+        c.name
+    ORDER BY
+        total_rent_hours DESC
+    LIMIT 1
+), CategoryRentWithHyphen AS (
+    SELECT
+        c.name AS category_name,
+        SUM(EXTRACT(EPOCH FROM (r.return_date - r.rental_date)) / 3600) AS total_rent_hours
+    FROM
+        category c
+    JOIN
+        film_category fc ON fc.category_id = c.category_id
+    JOIN
+        inventory i ON i.film_id = fc.film_id
+    JOIN
+        rental r ON r.inventory_id = i.inventory_id
+    JOIN
+        customer c2 ON c2.customer_id = r.customer_id
+    JOIN
+        address a ON a.address_id = c2.address_id
+    JOIN
+        city c3 ON c3.city_id = a.city_id AND c3.city LIKE '%-%'
+    GROUP BY
+        c.name
+    ORDER BY
+        total_rent_hours DESC
+    LIMIT 1
 )
 SELECT
     category_name,
-    MAX(hours_rented) AS max_total_rent_hours
+    total_rent_hours
 FROM
-    FilmCategoryRentHours
-WHERE
-    (city_id IN (SELECT city_id FROM city WHERE city LIKE 'a%'))
-    OR
-    (city_id IN (SELECT city_id FROM city WHERE city LIKE '%-%'))
-GROUP BY
-    category_name;
+    CategoryRent
+UNION
+SELECT
+    category_name,
+    total_rent_hours
+FROM
+    CategoryRentWithHyphen
+ORDER BY
+    total_rent_hours DESC;
